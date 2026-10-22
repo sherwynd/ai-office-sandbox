@@ -8,7 +8,11 @@ async function get(path) {
   const { port } = server.address();
   try {
     const res = await fetch(`http://localhost:${port}${path}`);
-    return { status: res.status, body: await res.text() };
+    return {
+      status: res.status,
+      contentType: res.headers.get("content-type"),
+      body: await res.text(),
+    };
   } finally {
     server.close();
   }
@@ -20,6 +24,15 @@ test("GET / says hello", async () => {
   assert.match(body, /Hello/);
 });
 
+test("GET /health returns ok", async () => {
+  const { status, contentType, body } = await get("/health");
+  assert.equal(status, 200);
+  assert.equal(contentType, "text/plain");
+  assert.equal(body, "ok");
+});
+
 test("unknown paths return 404", async () => {
-  assert.equal((await get("/nope")).status, 404);
+  const { status, body } = await get("/nope");
+  assert.equal(status, 404);
+  assert.equal(body, "Not found");
 });
