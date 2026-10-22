@@ -2,7 +2,7 @@
 # The hub starts it with workflow_dispatch; it is never triggered by issue text directly.
 #
 # Repo (or org) secrets needed:
-#   ANTHROPIC_API_KEY        – Claude API key
+#   CLAUDE_CODE_OAUTH_TOKEN  – Claude Pro/Max subscription token from `claude setup-token`
 #   AI_OFFICE_WORKER_SECRET  – same value as WORKER_SECRET on the hub
 name: AI Office worker
 run-name: ai-office job ${{ inputs.job_id }} (${{ inputs.stage }} #${{ inputs.issue_number }})
@@ -42,7 +42,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Uses your Claude subscription. To pay per use instead, replace with:
+          # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
           prompt: ${{ inputs.prompt }}
           claude_args: ${{ inputs.claude_args }}
