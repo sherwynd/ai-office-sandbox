@@ -46,6 +46,9 @@ jobs:
           # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
+          # The hub starts this run as its GitHub App, which the action treats as a bot.
+          # Allow only that App (its slug). Never use '*' here.
+          allowed_bots: sherwynd-ai-office
           prompt: ${{ inputs.prompt }}
           claude_args: ${{ inputs.claude_args }}
 
