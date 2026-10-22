@@ -6,6 +6,11 @@ export function handler(req, res) {
     res.end("Hello from the AI Office sandbox");
     return;
   }
+  if (req.url === "/health") {
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("ok");
+    return;
+  }
   res.writeHead(404, { "content-type": "text/plain" });
   res.end("Not found");
 }
