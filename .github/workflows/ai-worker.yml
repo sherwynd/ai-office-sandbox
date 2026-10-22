@@ -49,6 +49,7 @@ jobs:
           # The hub starts this run as its GitHub App, which the action treats as a bot.
           # Allow only that App (its slug). Never use '*' here.
           allowed_bots: sherwynd-ai-office
+          show_full_output: true  # TEMP: diagnosing, remove after
           prompt: ${{ inputs.prompt }}
           claude_args: ${{ inputs.claude_args }}
 
