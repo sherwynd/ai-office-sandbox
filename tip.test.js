@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calculateTip as ok, MESSAGES } from "./tip.js";
+import { calculateTip as ok, MESSAGES, initialState, update, view } from "./tip.js";
 
 test("quick tip: 80 at 15% (AC-3)", () => {
   assert.deepEqual(ok("80", "15", "1"), { tip: "12.00", total: "92.00", perPerson: "92.00" });
@@ -64,4 +64,66 @@ test("no tip chosen asks for one (AC-15)", () => {
 test("huge input never produces NaN, Infinity or negatives (AC-16)", () => {
   const r = ok("9".repeat(400), "15", "1");
   assert.doesNotMatch(JSON.stringify(r), /NaN|Infinity|-/);
+});
+
+test("fresh state is blank with 1 person and shows only the hint (AC-2, AC-19)", () => {
+  const v = view(initialState());
+  assert.equal(v.result, null);
+  assert.equal(v.shownError, null);
+  assert.equal(v.hint, true);
+  assert.equal(v.applied, "");
+  assert.equal(initialState().people, "1");
+});
+
+test("tapping a quick tip on an empty bill shows no error (AC-2)", () => {
+  const v = view(update(initialState(), { quick: "15" }));
+  assert.equal(v.shownError, null);
+  assert.equal(v.hint, true);
+  assert.equal(v.applied, "Applied tip: 15%");
+});
+
+test("bill with no tip asks for a tip under the tip group (AC-15)", () => {
+  const v = view(update(initialState(), { bill: "80" }));
+  assert.equal(v.shownError.field, "tip");
+  assert.equal(v.result, null);
+});
+
+test("custom and quick replace each other (AC-4, AC-5)", () => {
+  let s = update(update(initialState(), { bill: "50" }), { quick: "15" });
+  s = update(s, { custom: "12.5" });
+  assert.equal(s.quick, "");
+  let v = view(s);
+  assert.equal(v.result.tip, "6.25");
+  assert.equal(v.result.total, "56.25");
+  assert.equal(v.applied, "Applied tip: 12.5% (custom)");
+  s = update(s, { quick: "20" });
+  assert.equal(s.custom, "");
+  v = view(s);
+  assert.equal(v.result.tip, "10.00");
+  assert.equal(v.applied, "Applied tip: 20%");
+});
+
+test("clearing the bill shows the message, fixing it brings results back (AC-10, AC-16)", () => {
+  let s = update(update(update(initialState(), { bill: "80" }), { quick: "15" }), { people: "4" });
+  assert.equal(view(s).result.perPerson, "23.00");
+  s = update(s, { bill: "" });
+  let v = view(s);
+  assert.equal(v.shownError.field, "bill");
+  assert.equal(v.result, null);
+  assert.equal(v.fix, true);
+  s = update(s, { bill: "80" });
+  v = view(s);
+  assert.equal(v.shownError, null);
+  assert.equal(v.result.perPerson, "23.00");
+});
+
+test("a custom tip typed as '12.' is shown as 12%", () => {
+  const v = view(update(update(initialState(), { bill: "80" }), { custom: "12." }));
+  assert.equal(v.applied, "Applied tip: 12% (custom)");
+});
+
+test("an invalid custom tip hides the applied line (AC-14)", () => {
+  const v = view(update(update(initialState(), { bill: "80" }), { custom: "-3" }));
+  assert.equal(v.shownError.field, "custom");
+  assert.equal(v.applied, "");
 });

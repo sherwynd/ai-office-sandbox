@@ -73,7 +73,7 @@
   </div>
 </main>
 <script type="module">
-import { calculateTip } from "/tip.js";
+import { initialState, update, view } from "/tip.js";
 
 const $ = (id) => document.getElementById(id);
 const fields = { bill: $("bill"), custom: $("custom"), people: $("people") };
@@ -86,51 +86,43 @@ $("custom").value = "";
 $("people").value = "1";
 quick.forEach((r) => (r.checked = false));
 
-let percent = ""; // the tip in use: a quick choice or the custom text
-let custom = false;
-let touched = false;
+let state = initialState();
 
 function render() {
-  const result = calculateTip($("bill").value, percent, $("people").value);
-  const error = result.error;
+  const v = view(state);
   for (const field of ["bill", "tip", "custom", "people"]) {
     const msg = $(`${field}-error`);
-    const show = touched && error?.field === field;
+    const show = v.shownError?.field === field;
     msg.hidden = !show;
-    msg.textContent = show ? error.message : "";
+    msg.textContent = show ? v.shownError.message : "";
     if (show) describers[field].setAttribute("aria-describedby", msg.id);
     else describers[field].removeAttribute("aria-describedby");
     if (field !== "tip") describers[field].setAttribute("aria-invalid", String(show));
   }
-  const percentOk = percent.trim() !== "" && error?.field !== "custom";
-  $("applied").hidden = !percentOk;
-  $("applied").textContent = percentOk ? `Applied tip: ${percent.trim()}%${custom ? " (custom)" : ""}` : "";
+  $("applied").hidden = !v.applied;
+  $("applied").textContent = v.applied;
 
-  $("figures").hidden = !!error;
-  $("hint").hidden = !error || touched;
-  $("fix").hidden = !(error && touched);
-  if (!error) {
-    $("per-person").textContent = result.perPerson;
-    $("tip-amount").textContent = result.tip;
-    $("total-amount").textContent = result.total;
+  $("figures").hidden = !v.result;
+  $("hint").hidden = !v.hint;
+  $("fix").hidden = !v.fix;
+  if (v.result) {
+    $("per-person").textContent = v.result.perPerson;
+    $("tip-amount").textContent = v.result.tip;
+    $("total-amount").textContent = v.result.total;
   }
 }
 
-function changed() { touched = true; render(); }
+function change(c) { state = update(state, c); render(); }
 
-$("bill").addEventListener("input", changed);
-$("people").addEventListener("input", changed);
+$("bill").addEventListener("input", () => change({ bill: $("bill").value }));
+$("people").addEventListener("input", () => change({ people: $("people").value }));
 $("custom").addEventListener("input", () => {
   quick.forEach((r) => (r.checked = false));
-  percent = $("custom").value;
-  custom = true;
-  changed();
+  change({ custom: $("custom").value });
 });
 quick.forEach((r) => r.addEventListener("change", () => {
-  percent = r.value;
-  custom = false;
   $("custom").value = "";
-  changed();
+  change({ quick: r.value });
 }));
 
 render();

@@ -36,3 +36,36 @@ export function calculateTip(bill, percent, people) {
   const totalCents = billCents + tipCents;
   return { tip: money(tipCents), total: money(totalCents), perPerson: money(ceilDiv(totalCents, count)) };
 }
+
+// Page state, kept here (not in the page script) so the rules can be unit-tested.
+// Every load starts from initialState(): nothing is stored between visits.
+export const initialState = () => ({ bill: "", people: "1", custom: "", quick: "", touched: false });
+
+// change: one of { bill }, { people }, { custom }, { quick }.
+// A quick choice and the custom text replace each other; only the bill box
+// "wakes up" the messages, so tapping a tip on an empty bill stays quiet.
+export function update(state, change) {
+  if ("bill" in change) return { ...state, bill: change.bill, touched: true };
+  if ("people" in change) return { ...state, people: change.people };
+  if ("custom" in change) return { ...state, custom: change.custom, quick: "" };
+  if ("quick" in change) return { ...state, quick: change.quick, custom: "" };
+  return state;
+}
+
+// What the page should show for a state.
+export function view(state) {
+  const isCustom = state.quick === "";
+  const percent = isCustom ? state.custom : state.quick;
+  const result = calculateTip(state.bill, percent, state.people);
+  const error = result.error;
+  const shownError = state.touched && error ? error : null;
+  const percentOk = percent.trim() !== "" && error?.field !== "custom";
+  const shown = percent.trim().replace(/\.$/, "");
+  return {
+    result: error ? null : result,
+    shownError,
+    hint: !!error && !state.touched,
+    fix: !!shownError,
+    applied: percentOk ? `Applied tip: ${shown}%${isCustom ? " (custom)" : ""}` : "",
+  };
+}
