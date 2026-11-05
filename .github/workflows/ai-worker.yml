@@ -53,6 +53,11 @@ jobs:
           # Local runner support file, never part of a worker's implementation commit.
           echo '.claude/skills/humanizer/' >> .git/info/exclude
 
+      # QA checks pages in a headless browser. Same pinned Playwright as the hub's browser tools (BROWSER_MCP_PACKAGE).
+      - name: Install browser for QA
+        if: inputs.stage == 'qa'
+        run: npx --yes --package=@playwright/mcp@0.0.83 playwright install --with-deps chromium
+
       - name: Run Claude worker
         id: claude
         uses: anthropics/claude-code-action@v1
