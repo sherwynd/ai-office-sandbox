@@ -1,0 +1,60 @@
+# Copy to .github/workflows/ai-staging.yml in the project and review its setup before enabling automation.
+# Change the staging branch/environment here to match the AI Office project settings.
+# Configure hosting to deploy ONLY to staging from this workflow. Keep production secrets in the protected
+# production environment, never repository-wide. STAGING_URL and staging scripts are project-owned setup.
+name: AI Office staging
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: staging-delivery
+  cancel-in-progress: false
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --if-present
+      - run: npm test
+      # The project must implement these commands. Missing scripts fail rather than silently pass.
+      - name: Migrate staging database
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          # This project has no database, so db:migrate only says so and STAGING_DATABASE_URL is not needed.
+          npm run db:migrate
+      - name: Deploy staging
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: npm run deploy:staging
+      - name: Verify staging
+        env:
+          STAGING_URL: ${{ vars.STAGING_URL }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: |
+          test -n "$STAGING_URL"
+          npm run smoke:staging
+      - name: Save staging evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-evidence
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

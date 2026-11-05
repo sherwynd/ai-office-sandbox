@@ -11,7 +11,7 @@ export function handler(req, res) {
   }
   if (req.url === "/version") {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ version }));
+    res.end(JSON.stringify({ version, revision: process.env.REVISION ?? null }));
     return;
   }
   res.writeHead(404, { "content-type": "text/plain" });

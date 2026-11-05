@@ -1,0 +1,101 @@
+# Copy to .github/workflows/ai-production.yml on the project's default branch.
+# Also copy scripts/deployment-evidence.mjs from AI Office into the project.
+# Keep production environment approval enabled. Remove any other deploy-on-main path that bypasses this job.
+name: AI Office production
+run-name: "ai-office production release #${{ github.event.pull_request.number }} (${{ github.event.pull_request.head.sha }})"
+on:
+  pull_request:
+    types: [closed]
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+env:
+  # Match the project's AI Office setup. These are public settings, never database credentials.
+  STAGING_BRANCH: ${{ vars.AI_OFFICE_STAGING_BRANCH || 'staging' }}
+  STAGING_WORKFLOW: ${{ vars.AI_OFFICE_STAGING_WORKFLOW || 'ai-staging.yml' }}
+  STAGING_ENVIRONMENT: ${{ vars.AI_OFFICE_STAGING_ENVIRONMENT || 'staging' }}
+  STAGING_URL: ${{ vars.AI_OFFICE_STAGING_URL }}
+jobs:
+  verify:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'ai/release-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.evidence.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Read the verifier from the reviewed production merge, before any production secret is available.
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify staging migration evidence
+        id: evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          APPROVED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node scripts/deployment-evidence.mjs
+          echo "sha=$APPROVED_SHA" >> "$GITHUB_OUTPUT"
+  production:
+    needs: verify
+    concurrency:
+      group: production-delivery
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # GitHub withholds this job and its secrets until a required human reviewer approves.
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Run the exact application and migrations that passed staging, not a moving main branch.
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Recheck staging after approval
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/deployment-evidence.mjs
+      - run: npm ci
+      - name: Migrate production database
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          EXPECTED_REVISION: ${{ needs.verify.outputs.sha }}
+        run: |
+          # This project has no database, so db:migrate only says so and PRODUCTION_DATABASE_URL is not needed.
+          npm run db:migrate
+      - name: Deploy production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          EXPECTED_REVISION: ${{ needs.verify.outputs.sha }}
+        run: npm run deploy:production
+      - name: Verify production
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+          EXPECTED_REVISION: ${{ needs.verify.outputs.sha }}
+        run: |
+          test -n "$PRODUCTION_URL"
+          npm run smoke:production
+      - name: Release summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [ "$JOB_STATUS" = success ]; then
+            echo 'The approved database update, production deployment and smoke tests passed.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'The approved release did not finish. Check the failed step before retrying. It did not try to undo a completed database update.' >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -21,12 +21,12 @@ test("GET / says hello", async () => {
   assert.match(body, /Hello/);
 });
 
-test("GET /version returns the package.json version as JSON", async () => {
+test("GET /version returns the package.json version and deployed revision as JSON", async () => {
   const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url)));
   const { status, type, body } = await get("/version");
   assert.equal(status, 200);
   assert.equal(type, "application/json");
-  assert.deepEqual(JSON.parse(body), { version });
+  assert.deepEqual(JSON.parse(body), { version, revision: process.env.REVISION ?? null });
 });
 
 test("unknown paths return 404", async () => {
