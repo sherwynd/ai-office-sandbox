@@ -29,12 +29,29 @@ concurrency:
 
 jobs:
   work:
+    # GitHub-hosted (uses Actions minutes). For a self-hosted runner, e.g. a Mac:
+    #   runs-on: [self-hosted, macOS, ARM64]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # Trusted, pinned writing instructions. Never take a skill URL or version from issue text.
+      - name: Install Humanizer
+        run: |
+          mkdir -p .claude/skills/humanizer
+          curl --fail --silent --show-error --location --max-time 30 \
+            https://raw.githubusercontent.com/blader/humanizer/0ef9fe5bc3572734fd3ae6c448fe00a30cd5dcf0/SKILL.md \
+            -o .claude/skills/humanizer/SKILL.md
+          echo '0612f1dfb1672b0ea9b97e139bf1f06cabe98d8b27424fe8ff01e1fb4cc99cad  .claude/skills/humanizer/SKILL.md' | sha256sum --check
+          curl --fail --silent --show-error --location --max-time 30 \
+            https://raw.githubusercontent.com/blader/humanizer/0ef9fe5bc3572734fd3ae6c448fe00a30cd5dcf0/LICENSE \
+            -o .claude/skills/humanizer/LICENSE
+          echo '4ac4810254ab36d45419141aeb8e69bf50652cfafe5b2dab947d06d44e5cbf96  .claude/skills/humanizer/LICENSE' | sha256sum --check
+          # Local runner support file, never part of a worker's implementation commit.
+          echo '.claude/skills/humanizer/' >> .git/info/exclude
 
       - name: Run Claude worker
         id: claude
@@ -52,6 +69,16 @@ jobs:
           prompt: ${{ inputs.prompt }}
           claude_args: ${{ inputs.claude_args }}
 
+      # Full transcript, including which tool calls were denied. Visible to anyone who can read the repo.
+      - name: Save run log
+        if: always() && steps.claude.outputs.execution_file != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-run-log
+          path: ${{ steps.claude.outputs.execution_file }}
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Report to AI Office
         if: always()
         env:
@@ -63,11 +90,18 @@ jobs:
         run: |
           [ -n "$SECRET" ] || { echo "AI_OFFICE_WORKER_SECRET not set; skipping report"; exit 0; }
           COST=null
+          ERROR_TEXT=""
+          RATE_LIMITED=false
           if [ -f "$EXECUTION_FILE" ]; then
             COST=$(jq '[.[] | select(.type == "result")] | last | .total_cost_usd // null' "$EXECUTION_FILE")
+            # Lets the hub tell a Claude usage limit from other failures and retry after the reset.
+            ERROR_TEXT=$(jq -r '[.[] | select(.type == "result")] | last | if .is_error then (.result // "") else "" end' "$EXECUTION_FILE" | head -c 500)
+            RATE_LIMITED=$(jq '[.[] | select(.error == "rate_limit")] | length > 0' "$EXECUTION_FILE")
           fi
           BODY=$(jq -cn --arg job "$JOB_ID" --arg branch "$BRANCH_NAME" --argjson cost "$COST" \
-            '{job_id: $job, cost_usd: $cost, branch_name: (if $branch == "" then null else $branch end)}')
+            --arg error_text "$ERROR_TEXT" --argjson rate_limited "$RATE_LIMITED" \
+            '{job_id: $job, cost_usd: $cost, branch_name: (if $branch == "" then null else $branch end),
+              error_text: (if $error_text == "" then null else $error_text end), rate_limited: $rate_limited}')
           SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')"
           curl -fsS -X POST "$HUB_URL/api/jobs/$JOB_ID/report" \
             -H "content-type: application/json" -H "x-hub-signature-256: $SIG" --data "$BODY"
