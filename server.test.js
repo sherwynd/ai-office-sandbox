@@ -45,6 +45,12 @@ test("GET /tip.js serves the shared calculation", async () => {
   assert.match(body, /export function calculateTip/);
 });
 
+test("vercel.json uploads the files server.js reads at load", () => {
+  const config = JSON.parse(readFileSync(new URL("./vercel.json", import.meta.url)));
+  const include = config.functions["api/index.js"].includeFiles;
+  for (const file of ["package.json", "tip.html", "tip.js"]) assert.ok(include.includes(file), file);
+});
+
 test("unknown paths return 404", async () => {
   assert.equal((await get("/nope")).status, 404);
 });
