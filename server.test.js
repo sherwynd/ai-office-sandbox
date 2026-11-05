@@ -29,6 +29,22 @@ test("GET /version returns the package.json version and deployed revision as JSO
   assert.deepEqual(JSON.parse(body), { version, revision: process.env.REVISION ?? null });
 });
 
+test("GET /tip serves the calculator page (AC-1)", async () => {
+  const { status, type, body } = await get("/tip");
+  assert.equal(status, 200);
+  assert.match(type, /^text\/html/);
+  for (const text of ['id="bill"', 'value="10"', 'value="15"', 'value="20"', 'id="custom"', 'id="people"']) {
+    assert.ok(body.includes(text), text);
+  }
+});
+
+test("GET /tip.js serves the shared calculation", async () => {
+  const { status, type, body } = await get("/tip.js");
+  assert.equal(status, 200);
+  assert.match(type, /^text\/javascript/);
+  assert.match(body, /export function calculateTip/);
+});
+
 test("unknown paths return 404", async () => {
   assert.equal((await get("/nope")).status, 404);
 });
