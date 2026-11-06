@@ -35,7 +35,7 @@ test("half-cent amounts round up without float errors", () => {
 });
 
 test("blank, negative or non-numeric bill is rejected (AC-10, AC-11)", () => {
-  for (const bill of ["", "  ", "-5", "abc", "1e5", "1,5", "NaN", "Infinity"]) {
+  for (const bill of ["", "  ", "-5", "abc", "1e5", "1,5", "NaN", "Infinity", "."]) {
     assert.deepEqual(ok(bill, "15", "1").error, { field: "bill", message: MESSAGES.bill }, bill);
   }
 });
@@ -51,7 +51,7 @@ test("bad number of people is rejected (AC-13)", () => {
 });
 
 test("bad custom percentage is rejected, zero is accepted (AC-14)", () => {
-  for (const pct of ["-3", "abc", "1e999"]) {
+  for (const pct of ["-3", "abc", "1e999", "."]) {
     assert.deepEqual(ok("80", pct, "1").error, { field: "custom", message: MESSAGES.custom }, pct);
   }
   assert.equal(ok("80", "0", "1").tip, "0.00");
