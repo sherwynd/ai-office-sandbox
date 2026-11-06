@@ -18,12 +18,14 @@
   .details { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
   input[type=text] { display: block; width: 100%; min-height: 2.75rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem; font: inherit; border: 1px solid #7b8794; border-radius: 0.5rem; }
   input[aria-invalid=true] { border-color: var(--error); border-width: 2px; }
-  .quick { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
+  legend { float: left; width: 100%; }
+  .quick { clear: both; display: flex; gap: 0.5rem; margin: 0.5rem 0; }
   .quick label { flex: 1; position: relative; }
   .quick input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
   .quick span { display: flex; align-items: center; justify-content: center; min-height: 2.75rem; border: 2px solid var(--accent); border-radius: 0.5rem; background: #fff; color: var(--accent); font-weight: 600; }
   .quick input:checked + span { background: var(--accent); color: #fff; }
   .quick input:focus-visible + span, input[type=text]:focus-visible { outline: 3px solid #1f2933; outline-offset: 2px; }
+  input[type=text][aria-invalid=true]:focus-visible { outline: 0; }
   .error { color: var(--error); margin: 0.5rem 0 0; }
   .error[hidden], .results [hidden] { display: none; }
   .applied { margin: 0.5rem 0 0; }
@@ -73,7 +75,7 @@
   </div>
 </main>
 <script type="module">
-import { initialState, update, view } from "/tip.js";
+import { filterInput, initialState, update, view } from "/tip.js";
 
 const $ = (id) => document.getElementById(id);
 const fields = { bill: $("bill"), custom: $("custom"), people: $("people") };
@@ -114,11 +116,25 @@ function render() {
 
 function change(c) { state = update(state, c); render(); }
 
-$("bill").addEventListener("input", () => change({ bill: $("bill").value }));
-$("people").addEventListener("input", () => change({ people: $("people").value }));
+// Drop disallowed characters from a box (typed or pasted), keeping the caret in place.
+function clean(el, kind) {
+  const raw = el.value;
+  const text = filterInput(raw, kind);
+  if (text !== raw) {
+    const caret = filterInput(raw.slice(0, el.selectionStart), kind).length;
+    el.value = text;
+    el.setSelectionRange(caret, caret);
+  }
+  return text;
+}
+
+$("bill").addEventListener("input", () => change({ bill: clean($("bill"), "decimal") }));
+$("people").addEventListener("input", () => change({ people: clean($("people"), "whole") }));
 $("custom").addEventListener("input", () => {
+  const text = clean($("custom"), "decimal");
+  if (text === state.custom) return; // a blocked character changes nothing, so keep the quick choice
   quick.forEach((r) => (r.checked = false));
-  change({ custom: $("custom").value });
+  change({ custom: text });
 });
 quick.forEach((r) => r.addEventListener("change", () => {
   $("custom").value = "";
