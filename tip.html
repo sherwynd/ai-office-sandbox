@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tip calculator</title>
+<style>
+  :root { --text: #1f2933; --accent: #1f6f5c; --surface: #f3f7f5; --error: #b3261e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 1rem; background: var(--surface); color: var(--text); font-family: system-ui, sans-serif; }
+  main { max-width: 28rem; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0.5rem 0 1rem; }
+  .card { background: #fff; border-radius: 0.75rem; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); padding: 1rem; margin: 0 0 1rem; border: 0; min-width: 0; }
+  .results { background: #e3f1ec; }
+  .results h2, legend, label { font-size: 1rem; font-weight: 600; padding: 0; }
+  .results h2 { margin: 0 0 0.5rem; }
+  .big { font-size: 2.5rem; font-weight: 700; color: var(--accent); margin: 0; overflow-wrap: anywhere; }
+  .details { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
+  input[type=text] { display: block; width: 100%; min-height: 2.75rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem; font: inherit; border: 1px solid #7b8794; border-radius: 0.5rem; }
+  input[aria-invalid=true] { border-color: var(--error); border-width: 2px; }
+  .quick { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
+  .quick label { flex: 1; position: relative; }
+  .quick input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .quick span { display: flex; align-items: center; justify-content: center; min-height: 2.75rem; border: 2px solid var(--accent); border-radius: 0.5rem; background: #fff; color: var(--accent); font-weight: 600; }
+  .quick input:checked + span { background: var(--accent); color: #fff; }
+  .quick input:focus-visible + span, input[type=text]:focus-visible { outline: 3px solid #1f2933; outline-offset: 2px; }
+  .error { color: var(--error); margin: 0.5rem 0 0; }
+  .error[hidden], .results [hidden] { display: none; }
+  .applied { margin: 0.5rem 0 0; }
+  @media (min-width: 40rem) { .big { font-size: 3rem; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tip calculator</h1>
+
+  <section class="card results" aria-labelledby="res-h">
+    <h2 id="res-h">Each person pays</h2>
+    <div id="results" aria-live="polite">
+      <p id="hint">Enter a bill to see the tip, the total and each person's share.</p>
+      <p id="fix" hidden>Fix the box marked in red to see the split.</p>
+      <div id="figures" hidden>
+        <p class="big" id="per-person"></p>
+        <p class="details">Tip <span id="tip-amount"></span> | Total <span id="total-amount"></span></p>
+      </div>
+    </div>
+  </section>
+
+  <div class="card">
+    <label for="bill">Bill amount</label>
+    <input type="text" id="bill" inputmode="decimal" autocomplete="off">
+    <p class="error" id="bill-error" hidden></p>
+  </div>
+
+  <fieldset class="card" id="tip-group">
+    <legend>Tip</legend>
+    <div class="quick">
+      <label><input type="radio" name="quick" value="10"><span>10%</span></label>
+      <label><input type="radio" name="quick" value="15"><span>15%</span></label>
+      <label><input type="radio" name="quick" value="20"><span>20%</span></label>
+    </div>
+    <p class="error" id="tip-error" hidden></p>
+    <label for="custom">Custom tip %</label>
+    <input type="text" id="custom" inputmode="decimal" autocomplete="off">
+    <p class="error" id="custom-error" hidden></p>
+    <p class="applied" id="applied" hidden></p>
+  </fieldset>
+
+  <div class="card">
+    <label for="people">Number of people</label>
+    <input type="text" id="people" inputmode="numeric" autocomplete="off" value="1">
+    <p class="error" id="people-error" hidden></p>
+  </div>
+</main>
+<script type="module">
+import { initialState, update, view } from "/tip.js";
+
+const $ = (id) => document.getElementById(id);
+const fields = { bill: $("bill"), custom: $("custom"), people: $("people") };
+const describers = { bill: $("bill"), tip: $("tip-group"), custom: $("custom"), people: $("people") };
+const quick = [...document.querySelectorAll("input[name=quick]")];
+
+// Start blank on every load, even if the browser tries to restore form values.
+$("bill").value = "";
+$("custom").value = "";
+$("people").value = "1";
+quick.forEach((r) => (r.checked = false));
+
+let state = initialState();
+
+function render() {
+  const v = view(state);
+  for (const field of ["bill", "tip", "custom", "people"]) {
+    const msg = $(`${field}-error`);
+    const show = v.shownError?.field === field;
+    msg.hidden = !show;
+    msg.textContent = show ? v.shownError.message : "";
+    if (show) describers[field].setAttribute("aria-describedby", msg.id);
+    else describers[field].removeAttribute("aria-describedby");
+    if (field !== "tip") describers[field].setAttribute("aria-invalid", String(show));
+  }
+  $("applied").hidden = !v.applied;
+  $("applied").textContent = v.applied;
+
+  $("figures").hidden = !v.result;
+  $("hint").hidden = !v.hint;
+  $("fix").hidden = !v.fix;
+  if (v.result) {
+    $("per-person").textContent = v.result.perPerson;
+    $("tip-amount").textContent = v.result.tip;
+    $("total-amount").textContent = v.result.total;
+  }
+}
+
+function change(c) { state = update(state, c); render(); }
+
+$("bill").addEventListener("input", () => change({ bill: $("bill").value }));
+$("people").addEventListener("input", () => change({ people: $("people").value }));
+$("custom").addEventListener("input", () => {
+  quick.forEach((r) => (r.checked = false));
+  change({ custom: $("custom").value });
+});
+quick.forEach((r) => r.addEventListener("change", () => {
+  $("custom").value = "";
+  change({ quick: r.value });
+}));
+
+render();
+</script>
+</body>
+</html>
