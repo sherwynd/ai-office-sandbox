@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calculateTip as ok, MESSAGES, initialState, update, view } from "./tip.js";
+import { calculateTip as ok, MESSAGES, initialState, update, view, filterInput } from "./tip.js";
 
 test("quick tip: 80 at 15% (AC-3)", () => {
   assert.deepEqual(ok("80", "15", "1"), { tip: "12.00", total: "92.00", perPerson: "92.00" });
@@ -35,7 +35,7 @@ test("half-cent amounts round up without float errors", () => {
 });
 
 test("blank, negative or non-numeric bill is rejected (AC-10, AC-11)", () => {
-  for (const bill of ["", "  ", "-5", "abc", "1e5", "1,5", "NaN", "Infinity"]) {
+  for (const bill of ["", "  ", "-5", "abc", "1e5", "1,5", "NaN", "Infinity", "."]) {
     assert.deepEqual(ok(bill, "15", "1").error, { field: "bill", message: MESSAGES.bill }, bill);
   }
 });
@@ -51,7 +51,7 @@ test("bad number of people is rejected (AC-13)", () => {
 });
 
 test("bad custom percentage is rejected, zero is accepted (AC-14)", () => {
-  for (const pct of ["-3", "abc", "1e999"]) {
+  for (const pct of ["-3", "abc", "1e999", "."]) {
     assert.deepEqual(ok("80", pct, "1").error, { field: "custom", message: MESSAGES.custom }, pct);
   }
   assert.equal(ok("80", "0", "1").tip, "0.00");
@@ -134,4 +134,19 @@ test("an invalid custom tip hides the applied line even with a blank bill (AC-5)
     assert.equal(v.applied, "", bad);
     assert.equal(v.shownError, null, bad);
   }
+});
+
+test("filterInput keeps only allowed characters (AC-21)", () => {
+  assert.equal(filterInput("8a0", "decimal"), "80");
+  assert.equal(filterInput("1.2.3", "decimal"), "1.23");
+  assert.equal(filterInput("$1,250.75", "decimal"), "1250.75");
+  assert.equal(filterInput("-5", "decimal"), "5");
+  assert.equal(filterInput("+ 5", "decimal"), "5");
+  assert.equal(filterInput(".", "decimal"), ".");
+  assert.equal(filterInput("12.", "decimal"), "12.");
+  assert.equal(filterInput("2x", "whole"), "2");
+  assert.equal(filterInput("1.5", "whole"), "15");
+  assert.equal(filterInput("-3", "whole"), "3");
+  assert.equal(filterInput("", "whole"), "");
+  assert.equal(filterInput("80", "decimal"), "80");
 });
