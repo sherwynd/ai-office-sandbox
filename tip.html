@@ -25,7 +25,7 @@
   .quick span { display: flex; align-items: center; justify-content: center; min-height: 2.75rem; border: 2px solid var(--accent); border-radius: 0.5rem; background: #fff; color: var(--accent); font-weight: 600; }
   .quick input:checked + span { background: var(--accent); color: #fff; }
   .quick input:focus-visible + span, input[type=text]:focus-visible { outline: 3px solid #1f2933; outline-offset: 2px; }
-  input[type=text][aria-invalid=true]:focus-visible { outline: 0; }
+  input[aria-invalid=true]:focus-visible { outline: none; }
   .error { color: var(--error); margin: 0.5rem 0 0; }
   .error[hidden], .results [hidden] { display: none; }
   .applied { margin: 0.5rem 0 0; }
@@ -75,7 +75,7 @@
   </div>
 </main>
 <script type="module">
-import { filterInput, initialState, update, view } from "/tip.js";
+import { initialState, update, view, filterInput } from "/tip.js";
 
 const $ = (id) => document.getElementById(id);
 const fields = { bill: $("bill"), custom: $("custom"), people: $("people") };
@@ -116,25 +116,25 @@ function render() {
 
 function change(c) { state = update(state, c); render(); }
 
-// Drop disallowed characters from a box (typed or pasted), keeping the caret in place.
-function clean(el, kind) {
+// Drop characters the box may not hold (typed or pasted), keeping the caret in place.
+function cleaned(el, kind) {
   const raw = el.value;
-  const text = filterInput(raw, kind);
-  if (text !== raw) {
+  const clean = filterInput(raw, kind);
+  if (clean !== raw) {
     const caret = filterInput(raw.slice(0, el.selectionStart), kind).length;
-    el.value = text;
+    el.value = clean;
     el.setSelectionRange(caret, caret);
   }
-  return text;
+  return clean;
 }
 
-$("bill").addEventListener("input", () => change({ bill: clean($("bill"), "decimal") }));
-$("people").addEventListener("input", () => change({ people: clean($("people"), "whole") }));
+$("bill").addEventListener("input", () => change({ bill: cleaned($("bill"), "decimal") }));
+$("people").addEventListener("input", () => change({ people: cleaned($("people"), "whole") }));
 $("custom").addEventListener("input", () => {
-  const text = clean($("custom"), "decimal");
-  if (text === state.custom) return; // a blocked character changes nothing, so keep the quick choice
+  const value = cleaned($("custom"), "decimal");
+  if (value === state.custom) return; // a blocked character: keep the quick choice
   quick.forEach((r) => (r.checked = false));
-  change({ custom: text });
+  change({ custom: value });
 });
 quick.forEach((r) => r.addEventListener("change", () => {
   $("custom").value = "";

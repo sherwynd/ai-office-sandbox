@@ -9,4 +9,4 @@ A tiny Node.js (ESM, no dependencies) HTTP server used to test AI Office workers
 
 ## Lessons
 
-- Restrict what a text box accepts at input time with a pure, unit-tested filter, and never let a focus outline stack on top of an error border (#7)
+- Filter unwanted characters out of text boxes as they are typed or pasted, in a tested pure function, instead of letting them in and showing an error; give an invalid box one error style, not an error border plus a focus outline (#7)

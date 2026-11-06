@@ -16,15 +16,13 @@ function parseDecimal(text) {
   return { n: BigInt(whole + frac), d: 10n ** BigInt(frac.length) };
 }
 
-// What a box may hold: "decimal" = digits and the first decimal point, "whole" = digits only.
-// Everything else (letters, signs, spaces, a second point) is dropped, for typing and pasting alike.
+// Keep only what a box may hold: "decimal" = digits and the first ".", "whole" = digits.
 export function filterInput(text, kind) {
   const s = String(text ?? "");
   if (kind === "whole") return s.replace(/\D/g, "");
   const i = s.indexOf(".");
-  const head = i < 0 ? s : s.slice(0, i);
-  const tail = i < 0 ? "" : s.slice(i + 1);
-  return head.replace(/\D/g, "") + (i < 0 ? "" : "." + tail.replace(/\D/g, ""));
+  const clean = (t) => t.replace(/[^\d]/g, "");
+  return i < 0 ? clean(s) : `${clean(s.slice(0, i))}.${clean(s.slice(i + 1))}`;
 }
 
 const roundHalfUp = (n, d) => (2n * n + d) / (2n * d);
