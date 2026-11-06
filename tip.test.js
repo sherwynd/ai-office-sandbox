@@ -127,3 +127,11 @@ test("an invalid custom tip hides the applied line (AC-14)", () => {
   assert.equal(v.shownError.field, "custom");
   assert.equal(v.applied, "");
 });
+
+test("an invalid custom tip hides the applied line even with a blank bill (AC-5)", () => {
+  for (const bad of ["-3", "abc"]) {
+    const v = view(update(initialState(), { custom: bad }));
+    assert.equal(v.applied, "", bad);
+    assert.equal(v.shownError, null, bad);
+  }
+});

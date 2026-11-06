@@ -59,7 +59,7 @@ export function view(state) {
   const result = calculateTip(state.bill, percent, state.people);
   const error = result.error;
   const shownError = state.touched && error ? error : null;
-  const percentOk = percent.trim() !== "" && error?.field !== "custom";
+  const percentOk = parseDecimal(percent) !== null;
   const shown = percent.trim().replace(/\.$/, "");
   return {
     result: error ? null : result,
